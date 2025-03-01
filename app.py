@@ -1,8 +1,9 @@
 import os
 import shutil
 from tempfile import NamedTemporaryFile
+import uuid
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Form, HTTPException
 
 from fastapi import FastAPI, File, UploadFile
 
@@ -93,7 +94,7 @@ async def face_analyze(img: UploadFile= File(...)):
         raise HTTPException(status_code=500, detail={"success": False, "message": str(e)})
 
 @app.post("/face-recognition")
-async def face_recognition(img: UploadFile= File(...), path: str = "db"):
+async def face_recognition(img: UploadFile= File(...), path: str = Form("db")):
     try:
         with NamedTemporaryFile(delete=True, suffix=".jpg") as temp_img:
             shutil.copyfileobj(img.file, temp_img)
@@ -120,17 +121,21 @@ async def face_recognition(img: UploadFile= File(...), path: str = "db"):
         raise HTTPException(status_code=500, detail={"success": False, "message": str(e)})
 
 @app.post("/upload-db")
-async def upload_db(img: UploadFile= File(...), dir: str = "db"):
+async def upload_db(img: UploadFile = File(...), dir: str = Form("db")):
     try:
+        # Pastikan direktori ada
         os.makedirs(dir, exist_ok=True)
 
-        img_path = os.path.join(dir, img.filename)
+        ext = os.path.splitext(img.filename)[1]
+        random_filename = f"{uuid.uuid4().hex}{ext}"
+
+        img_path = os.path.join(dir, random_filename)
         with open(img_path, "wb") as f:
             shutil.copyfileobj(img.file, f)
 
         return {
             "success": True,
-            "message": f"Gambar '{img.filename}' berhasil diunggah ke folder '{dir}/'",
+            "message": f"Image '{img.filename}' successfully uploaded to folder '{dir}'",
             "path": img_path
         }
     except Exception as e:

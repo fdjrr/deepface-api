@@ -1,3 +1,4 @@
+import os
 import shutil
 from tempfile import NamedTemporaryFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -40,7 +41,7 @@ async def face_verify(img1: UploadFile= File(...), img2: UploadFile= File(...)):
             "result": result
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail={"success": False, "message": str(e)})
 
 @app.post('/anti-spoofing')
 async def face_anti_spoofing(img: UploadFile= File(...)):
@@ -68,7 +69,7 @@ async def face_anti_spoofing(img: UploadFile= File(...)):
                 }
             }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail={"success": False, "message": str(e)})
 
 @app.post('/analyze')
 async def face_analyze(img: UploadFile= File(...)):
@@ -89,7 +90,7 @@ async def face_analyze(img: UploadFile= File(...)):
                 "result": result
             }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail={"success": False, "message": str(e)})
 
 @app.post("/face-recognition")
 async def face_recognition(img: UploadFile= File(...), path: str = "db"):
@@ -116,7 +117,24 @@ async def face_recognition(img: UploadFile= File(...), path: str = "db"):
                 "message": "No face match found."
             }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail={"success": False, "message": str(e)})
+
+@app.post("/upload-db")
+async def upload_db(img: UploadFile= File(...), dir: str = "db"):
+    try:
+        os.makedirs(dir, exist_ok=True)
+
+        img_path = os.path.join(dir, img.filename)
+        with open(img_path, "wb") as f:
+            shutil.copyfileobj(img.file, f)
+
+        return {
+            "success": True,
+            "message": f"Gambar '{img.filename}' berhasil diunggah ke folder '{dir}/'",
+            "path": img_path
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail={"success": False, "message": str(e)})
 
 if __name__ == "__main__":
     import uvicorn

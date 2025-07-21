@@ -4,6 +4,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: deepface-api
+    environment:
+      - PYTHONUNBUFFERED=1
     ports:
       - "4912:4912"
     volumes:

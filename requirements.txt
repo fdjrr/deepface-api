@@ -1,6 +1,8 @@
 fastapi
 uvicorn
 deepface
+tf-keras
+loguru
+numpy
 minio
 python-dotenv
-tf-keras

@@ -1,20 +1,17 @@
-import os
-import shutil
-
-import uvicorn
-from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from deepface import DeepFace
-from middlewares.api_key import verify_api_key
-from utils.minio_client import download_file, list_files
-
-load_dotenv()
+from face_service import recognize_faces, verify_faces
+from storage import (
+    delete_db_images,
+    delete_image,
+    download_db_images,
+    download_image,
+    get_image_path,
+)
 
 app = FastAPI()
-
 
 app.add_middleware(
     CORSMiddleware,
@@ -25,77 +22,72 @@ app.add_middleware(
 )
 
 
-class FaceRecognitionRequest(BaseModel):
+class VerifyRequest(BaseModel):
+    img1_path: str
+    img2_path: str
+
+
+class RecognitionRequest(BaseModel):
     img_path: str
     db_path: str
 
 
-def is_real_face_with_deepface(img_path: str) -> bool:
+@app.post("/verify")
+async def verify(req: VerifyRequest):
     try:
-        analysis = DeepFace.analyze(
-            img_path=img_path,
-            actions=["gender"],
-            enforce_detection=False,
-            detector_backend="retinaface",
-            anti_spoofing=True,
-        )
+        download_image(req.img1_path)
+        download_image(req.img2_path)
 
-        print(analysis)
+        img1_path = get_image_path(req.img1_path)
+        img2_path = get_image_path(req.img2_path)
 
-        return analysis
-    except Exception as e:
-        print("Anti-spoofing detection failed:", e)
-        return False
+        result = verify_faces(img1_path, img2_path)
 
-
-@app.post("/face-recognition")
-async def recognize_face(
-    payload: FaceRecognitionRequest, _: None = Depends(verify_api_key)
-):
-    bucket_name = os.getenv("MINIO_BUCKET_NAME")
-    temp_dir = os.getenv("TEMP_DIR", "tmp")
-
-    local_img_path = os.path.join(temp_dir, payload.img_path)
-
-    try:
-        download_file(bucket_name, payload.img_path, local_img_path)
-    except Exception as e:
-        raise HTTPException(status_code=404, detail=f"Image not found: {e}")
-
-    if not is_real_face_with_deepface(local_img_path):
-        return {"matched": False, "message": "Spoofing detected (fake image)"}
-
-    local_db_path = os.path.join(temp_dir, payload.db_path)
-    os.makedirs(local_db_path, exist_ok=True)
-
-    try:
-        for obj in list_files(bucket_name, payload.db_path):
-            rel_path = obj.object_name
-            local_file_path = os.path.join(temp_dir, rel_path)
-            download_file(bucket_name, rel_path, local_file_path)
-    except Exception as e:
-        raise HTTPException(status_code=404, detail=f"Database download failed: {e}")
-
-    try:
-        result = DeepFace.find(
-            img_path=local_img_path,
-            db_path=local_db_path,
-            enforce_detection=False,
-            detector_backend="retinaface",
-        )
-        if result and len(result) > 0 and not result[0].empty:
-            match = result[0].iloc[0].to_dict()
-            return {"matched": True, "result": match}
-        else:
-            return {"matched": False, "message": "No match found"}
+        return {"result": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        for folder in [payload.img_path, payload.db_path]:
-            full_dir_path = os.path.join(temp_dir, os.path.dirname(folder))
-            if os.path.exists(full_dir_path):
-                shutil.rmtree(full_dir_path, ignore_errors=True)
+        delete_image(req.img1_path)
+        delete_image(req.img2_path)
 
 
-if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=1234, reload=True)
+@app.post("/recognition")
+async def recognition(req: RecognitionRequest):
+    try:
+        download_image(req.img_path)
+        download_db_images(req.db_path)
+
+        img_path = get_image_path(req.img_path)
+        db_path = get_image_path(req.db_path)
+
+        persons = recognize_faces(img_path, db_path)
+
+        result = []
+
+        if isinstance(persons, list):
+            for df in persons:
+                if not df.empty:
+                    for _, row in df.iterrows():
+                        result.append(
+                            {
+                                "identity": row["identity"],
+                                "threshold": float(row["threshold"]),
+                                "distance": float(row["distance"]),
+                            }
+                        )
+        else:
+            for _, row in persons.iterrows():
+                result.append(
+                    {
+                        "identity": row["identity"],
+                        "threshold": float(row["threshold"]),
+                        "distance": float(row["distance"]),
+                    }
+                )
+
+        return {"result": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        delete_image(req.img_path)
+        delete_db_images(req.db_path)

@@ -1,0 +1,16 @@
+services:
+  app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: deepface-api
+    ports:
+      - "4912:4912"
+    volumes:
+      - .env:/app/.env
+    networks:
+      - homelabs
+
+networks:
+  homelabs:
+    external: true

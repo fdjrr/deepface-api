@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from face_service import recognize_faces, verify_faces
+from face_service import analyze_face, recognize_faces, verify_faces
 from storage import (
     delete_db_images,
     delete_image,
@@ -30,6 +30,10 @@ class VerifyRequest(BaseModel):
 class RecognitionRequest(BaseModel):
     img_path: str
     db_path: str
+
+
+class AnalyzeRequest(BaseModel):
+    img_path: str
 
 
 @app.post("/verify")
@@ -91,3 +95,19 @@ async def recognition(req: RecognitionRequest):
     finally:
         delete_image(req.img_path)
         delete_db_images(req.db_path)
+
+
+@app.post("/analyze")
+async def analyze(req: AnalyzeRequest):
+    try:
+        download_image(req.img_path)
+
+        img_path = get_image_path(req.img_path)
+
+        result = analyze_face(img_path)
+
+        return {"result": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        delete_image(req.img_path)

@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from loguru import logger
 from pydantic import BaseModel
 
 from face_service import analyze_face, recognize_faces, verify_faces
@@ -10,6 +11,7 @@ from storage import (
     download_image,
     get_image_path,
 )
+from util import convert
 
 app = FastAPI()
 
@@ -39,31 +41,44 @@ class AnalyzeRequest(BaseModel):
 @app.post("/verify")
 async def verify(req: VerifyRequest):
     try:
+        logger.info("Downloading img1_path...")
         download_image(req.img1_path)
+
+        logger.info("Downloading img2_path...")
         download_image(req.img2_path)
 
         img1_path = get_image_path(req.img1_path)
         img2_path = get_image_path(req.img2_path)
 
+        logger.info("Verifying faces...")
         result = verify_faces(img1_path, img2_path)
 
         return {"result": result}
     except Exception as e:
+        logger.error(e)
+
         raise HTTPException(status_code=500, detail=str(e))
     finally:
+        logger.info("Deleting img1_path...")
         delete_image(req.img1_path)
+
+        logger.info("Deleting img2_path...")
         delete_image(req.img2_path)
 
 
 @app.post("/recognition")
 async def recognition(req: RecognitionRequest):
     try:
+        logger.info("Downloading img_path...")
         download_image(req.img_path)
+
+        logger.info("Downloading db_path...")
         download_db_images(req.db_path)
 
         img_path = get_image_path(req.img_path)
         db_path = get_image_path(req.db_path)
 
+        logger.info("Recognizing faces...")
         persons = recognize_faces(img_path, db_path)
 
         result = []
@@ -91,23 +106,33 @@ async def recognition(req: RecognitionRequest):
 
         return {"result": result}
     except Exception as e:
+        logger.error(e)
+
         raise HTTPException(status_code=500, detail=str(e))
     finally:
+        logger.info("Deleting img_path...")
         delete_image(req.img_path)
+
+        logger.info("Deleting db_path...")
         delete_db_images(req.db_path)
 
 
 @app.post("/analyze")
 async def analyze(req: AnalyzeRequest):
     try:
+        logger.info("Downloading img_path...")
         download_image(req.img_path)
 
         img_path = get_image_path(req.img_path)
 
+        logger.info("Analyzing face...")
         result = analyze_face(img_path)
 
-        return {"result": result}
+        return {"result": convert(result)}
     except Exception as e:
+        logger.error(e)
+
         raise HTTPException(status_code=500, detail=str(e))
     finally:
+        logger.info("Deleting img_path...")
         delete_image(req.img_path)

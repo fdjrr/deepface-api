@@ -37,18 +37,18 @@ def recognize_faces(
     img_path: str,
     db_path: str,
     model_name: str = DEEPFACE_MODEL,
-    detector_backend: str = DEEPFACE_DETECTOR_BACKEND,
     distance_metric: str = DEEPFACE_DISTANCE_METRIC,
     enforce_detection: bool = True,
+    detector_backend: str = DEEPFACE_DETECTOR_BACKEND,
     anti_spoofing: bool = False,
 ):
     result = DeepFace.find(
         img_path=img_path,
         db_path=db_path,
         model_name=model_name,
-        detector_backend=detector_backend,
         distance_metric=distance_metric,
         enforce_detection=enforce_detection,
+        detector_backend=detector_backend,
         anti_spoofing=anti_spoofing,
     )
 
@@ -58,16 +58,14 @@ def recognize_faces(
 def analyze_face(
     img_path: str,
     detector_backend: str = DEEPFACE_DETECTOR_BACKEND,
-    distance_metric: str = DEEPFACE_DISTANCE_METRIC,
     enforce_detection: bool = True,
     anti_spoofing: bool = False,
 ):
     result = DeepFace.analyze(
         img_path=img_path,
         actions=["age", "gender"],
-        detector_backend=detector_backend,
-        distance_metric=distance_metric,
         enforce_detection=enforce_detection,
+        detector_backend=detector_backend,
         anti_spoofing=anti_spoofing,
     )
 

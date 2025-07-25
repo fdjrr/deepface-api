@@ -7,7 +7,7 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
     ports:
-      - "4912:4912"
+      - "4912:8000"
     volumes:
       - .env:/app/.env
     networks:
